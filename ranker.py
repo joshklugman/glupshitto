@@ -1,20 +1,4 @@
-"""
-Star Wars Databank Beli-Style Ranker
 
-Run the Streamlit app:
-    python -m pip install streamlit requests pandas
-    python -m streamlit run ranker.py
-
-Run built-in logic tests without Streamlit installed:
-    python ranker.py --test
-
-Notes:
-- This version uses the Star Wars Databank API instead of SWAPI because Databank
-  includes images and longer descriptions.
-- Databank categories available from the public docs are:
-  characters, creatures, droids, locations, organizations, species, vehicles.
-- The API does not currently document separate films or starships endpoints.
-"""
 
 from __future__ import annotations
 
