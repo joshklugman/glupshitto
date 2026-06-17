@@ -246,6 +246,70 @@ def render_rankings_table(rows: Sequence[dict]) -> str:
     """
 
 
+def render_console_stats(stats: Sequence[Tuple[str, Any, str]]) -> str:
+    cells = []
+    for label, value, signal in stats:
+        cells.append(
+            f"""
+<div class="console-stat">
+    <div class="console-stat-signal">{html.escape(signal)}</div>
+    <div class="console-stat-label">{html.escape(label)}</div>
+    <div class="console-stat-value">{html.escape(str(value))}</div>
+</div>
+"""
+        )
+
+    return f"""
+<div class="console-stat-grid">
+    {''.join(cells)}
+</div>
+"""
+
+
+def render_item_snapshot(item: dict, label: str) -> str:
+    item_category = CATEGORIES.get(item.get("category", ""), {}).get("label", item.get("category", "Unknown"))
+    image_url = item.get("image")
+    image_html = (
+        f'<img class="holo-image" src="{html.escape(str(image_url), quote=True)}" alt="{html.escape(item["name"], quote=True)}">'
+        if image_url
+        else '<div class="holo-image holo-image-empty">NO IMAGE SIGNAL</div>'
+    )
+    return f"""
+<div class="item-terminal">
+    <div class="item-terminal-top">
+        <div class="card-sigil">
+            <div class="card-badge">{html.escape(label)}</div>
+            <div>
+                <div class="aurebesh">DATABANK RECORD {html.escape(label)} // TARGET LOCK</div>
+                <div class="card-title">{html.escape(item["name"])}</div>
+                <div class="card-category">{html.escape(item_category)}</div>
+            </div>
+        </div>
+        <div class="item-frequency">SIG-{html.escape(str(item["id"]))[:18]}</div>
+    </div>
+    <div class="holo-image-shell">{image_html}</div>
+    <div class="item-stat-grid">
+        <div>
+            <div class="item-stat-label">Rating</div>
+            <div class="item-stat-value">{html.escape(display_rating(item))}</div>
+        </div>
+        <div>
+            <div class="item-stat-label">Wins</div>
+            <div class="item-stat-value">{int(item["wins"])}</div>
+        </div>
+        <div>
+            <div class="item-stat-label">Losses</div>
+            <div class="item-stat-value">{int(item["losses"])}</div>
+        </div>
+        <div>
+            <div class="item-stat-label">Battles</div>
+            <div class="item-stat-value">{int(item["battles"])}</div>
+        </div>
+    </div>
+</div>
+"""
+
+
 def extract_data(payload: Any) -> Tuple[List[dict], Optional[str]]:
     """Return data list and next-page URL/path from a Databank response."""
     if isinstance(payload, list):
@@ -1266,6 +1330,91 @@ def run_streamlit_app() -> None:
                 color: var(--text-soft);
                 padding: 0.75rem 0.9rem;
                 margin: 0.8rem 0;
+                line-height: 1.35;
+            }
+
+            .control-strip,
+            .transmission-strip {
+                border: 1px solid rgba(105, 215, 255, 0.24);
+                border-radius: 8px;
+                background:
+                    linear-gradient(90deg, rgba(105, 215, 255, 0.11), rgba(255, 232, 31, 0.045)),
+                    rgba(5, 10, 19, 0.78);
+                box-shadow: inset 0 0 16px rgba(105, 215, 255, 0.035);
+                color: var(--text-soft);
+                margin: 0.65rem 0 0.9rem;
+                padding: 0.72rem 0.82rem;
+            }
+
+            .control-strip-title,
+            .transmission-strip-title {
+                color: var(--rebel-gold);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.78rem;
+                font-weight: 900;
+                text-transform: uppercase;
+            }
+
+            .control-strip-copy,
+            .transmission-strip-copy {
+                color: var(--text-muted);
+                font-size: 0.92rem;
+                font-weight: 600;
+                line-height: 1.25;
+                margin-top: 0.25rem;
+            }
+
+            .console-stat-grid {
+                display: grid;
+                gap: 0.7rem;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                margin: 1rem 0 1.1rem;
+            }
+
+            .console-stat {
+                border: 1px solid rgba(255, 232, 31, 0.28);
+                border-radius: 8px;
+                background:
+                    linear-gradient(135deg, rgba(255, 232, 31, 0.11), transparent 34%),
+                    linear-gradient(180deg, rgba(10, 17, 31, 0.94), rgba(5, 8, 16, 0.98));
+                box-shadow: inset 0 0 20px rgba(105, 215, 255, 0.035);
+                min-height: 94px;
+                padding: 0.78rem 0.9rem;
+            }
+
+            .console-stat-signal {
+                color: var(--holo-green);
+                font-family: 'Aurebesh', 'Orbitron', sans-serif;
+                font-size: 0.7rem;
+                letter-spacing: 0.08em;
+                margin-bottom: 0.35rem;
+            }
+
+            .console-stat-label {
+                color: var(--hyperspace-blue);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.72rem;
+                font-weight: 900;
+                text-transform: uppercase;
+            }
+
+            .console-stat-value {
+                color: var(--rebel-gold);
+                font-family: 'Orbitron', sans-serif;
+                font-size: clamp(1.25rem, 2vw, 1.85rem);
+                font-weight: 900;
+                line-height: 1;
+                margin-top: 0.42rem;
+            }
+
+            .item-terminal {
+                position: relative;
+            }
+
+            .item-terminal-top {
+                border-bottom: 1px solid rgba(105, 215, 255, 0.22);
+                margin-bottom: 0.8rem;
+                padding-bottom: 0.7rem;
             }
 
             .card-sigil {
@@ -1305,6 +1454,88 @@ def run_streamlit_app() -> None:
                 font-weight: 700;
                 margin-top: 0.18rem;
                 text-transform: uppercase;
+            }
+
+            .item-frequency {
+                color: var(--text-muted);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.66rem;
+                font-weight: 700;
+                margin-top: 0.35rem;
+                opacity: 0.86;
+                text-transform: uppercase;
+            }
+
+            .holo-image-shell {
+                align-items: center;
+                border: 1px solid rgba(105, 215, 255, 0.28);
+                border-radius: 8px;
+                background:
+                    radial-gradient(circle at center, rgba(105, 215, 255, 0.16), transparent 56%),
+                    rgba(2, 6, 12, 0.82);
+                display: flex;
+                height: clamp(280px, 34vw, 460px);
+                justify-content: center;
+                margin: 0.75rem 0;
+                overflow: hidden;
+                position: relative;
+                width: 100%;
+            }
+
+            .holo-image-shell:after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: repeating-linear-gradient(180deg, rgba(157, 255, 207, 0.06) 0 1px, transparent 1px 6px);
+                pointer-events: none;
+            }
+
+            .holo-image {
+                display: block;
+                height: 100%;
+                object-fit: contain;
+                width: 100%;
+            }
+
+            .holo-image-empty {
+                align-items: center;
+                color: var(--holo-green);
+                display: flex;
+                font-family: 'Orbitron', sans-serif;
+                font-weight: 900;
+                height: 100%;
+                justify-content: center;
+                width: 100%;
+            }
+
+            .item-stat-grid {
+                display: grid;
+                gap: 0.45rem;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                margin: 0.75rem 0;
+            }
+
+            .item-stat-grid > div {
+                border: 1px solid rgba(105, 215, 255, 0.24);
+                border-radius: 6px;
+                background: rgba(5, 12, 20, 0.72);
+                padding: 0.5rem 0.55rem;
+            }
+
+            .item-stat-label {
+                color: var(--hyperspace-blue);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.62rem;
+                font-weight: 900;
+                text-transform: uppercase;
+            }
+
+            .item-stat-value {
+                color: var(--rebel-gold);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 1.08rem;
+                font-weight: 900;
+                margin-top: 0.18rem;
             }
 
             [data-testid="stSidebar"] {
@@ -1682,6 +1913,11 @@ def run_streamlit_app() -> None:
                     align-items: flex-start;
                     flex-direction: column;
                 }
+
+                .console-stat-grid,
+                .item-stat-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
             }
         </style>
         """,
@@ -1810,8 +2046,16 @@ def run_streamlit_app() -> None:
 
     with st.sidebar:
         st.header("Controls")
-        st.markdown('<div class="aurebesh">CONTROL NODE // SECTOR MENU</div>', unsafe_allow_html=True)
-        st.caption(f"Logged in as {st.session_state.username}")
+        st.markdown(
+            f"""
+            <div class="control-strip">
+                <div class="aurebesh">CONTROL NODE // SECTOR MENU</div>
+                <div class="control-strip-title">Operator</div>
+                <div class="control-strip-copy">{html.escape(st.session_state.username)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         if st.button("Log out", use_container_width=True):
             st.session_state.username = None
             st.session_state.rankings = {}
@@ -1828,7 +2072,15 @@ def run_streamlit_app() -> None:
             key="active_category",
         )
 
-        st.caption("Databank API categories do not currently include separate films or starships endpoints.")
+        st.markdown(
+            """
+            <div class="control-strip">
+                <div class="control-strip-title">Archive Notice</div>
+                <div class="control-strip-copy">Databank API categories do not currently include separate films or starships endpoints.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         st.divider()
         if st.button("Reset this category", use_container_width=True):
@@ -1930,6 +2182,24 @@ def run_streamlit_app() -> None:
         if category != "all" or sync_category != loser_item.get("category") or sync_category not in DATABANK_CATEGORY_KEYS:
             return
 
+        winner_category_id = category_item_id(winner_item)
+        loser_category_id = category_item_id(loser_item)
+        st.session_state.matchup_pair_keys.setdefault(
+            sync_category,
+            load_matchup_pair_keys(st.session_state.username, sync_category),
+        )
+        save_matchup_result(
+            st.session_state.username,
+            sync_category,
+            winner_category_id,
+            loser_category_id,
+            winner_id=winner_category_id,
+            loser_id=loser_category_id,
+        )
+        st.session_state.matchup_pair_keys[sync_category].add(
+            matchup_pair_key(winner_category_id, loser_category_id)
+        )
+
         category_items = load_ranking_items_for_category(sync_category)
         if apply_same_category_vote(category_items, winner_item, loser_item):
             save_user_progress(
@@ -1939,6 +2209,28 @@ def run_streamlit_app() -> None:
                 st.session_state.current_pair.get(sync_category),
                 winner_item["name"],
             )
+
+    def sync_all_skip_to_individual_category(item_a: dict, item_b: dict) -> None:
+        sync_category = item_a.get("category")
+        if category != "all" or sync_category != item_b.get("category") or sync_category not in DATABANK_CATEGORY_KEYS:
+            return
+
+        category_id_a = category_item_id(item_a)
+        category_id_b = category_item_id(item_b)
+        st.session_state.matchup_pair_keys.setdefault(
+            sync_category,
+            load_matchup_pair_keys(st.session_state.username, sync_category),
+        )
+        save_matchup_result(
+            st.session_state.username,
+            sync_category,
+            category_id_a,
+            category_id_b,
+            skipped=True,
+        )
+        st.session_state.matchup_pair_keys[sync_category].add(
+            matchup_pair_key(category_id_a, category_id_b)
+        )
 
     def vote(winner_id: str, loser_id: str) -> None:
         winner_item = next(item for item in items if item["id"] == winner_id)
@@ -1971,39 +2263,10 @@ def run_streamlit_app() -> None:
             st.session_state.last_pick,
         )
 
-    def show_item_card(item: dict, label: str, opponent: dict, top_pick_key: str) -> None:
-        item_category = CATEGORIES.get(item.get("category", ""), {}).get("label", item.get("category", "Unknown"))
-        st.markdown(
-            f"""
-            <div class="card-sigil">
-                <div class="card-badge">{html.escape(label)}</div>
-                <div>
-                    <div class="aurebesh">DATABANK RECORD {html.escape(label)} // TARGET LOCK</div>
-                    <div class="card-title">{html.escape(item["name"])}</div>
-                    <div class="card-category">{html.escape(item_category)}</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    def show_item_card(item: dict, label: str) -> None:
+        st.markdown(render_item_snapshot(item, label), unsafe_allow_html=True)
 
-        name_col, pick_col = st.columns([0.68, 0.32], vertical_alignment="center")
-        with name_col:
-            st.markdown(f"### {label}: {item['name']}")
-        with pick_col:
-            if st.button("Pick", key=top_pick_key, use_container_width=True):
-                vote(item["id"], opponent["id"])
-                st.rerun()
-
-        image_url = item.get("image")
-        if image_url:
-            st.image(image_url, use_container_width=True)
-        else:
-            st.info("No image available")
-
-        st.metric("Rating", display_rating(item))
-        st.caption(f"Record: {item['wins']}W / {item['losses']}L · {item['battles']} battles")
-
+    def show_item_details(item: dict) -> None:
         description = item.get("description") or "No description available."
         st.markdown(
             f'<div class="holo-callout">{html.escape(description)}</div>',
@@ -2035,18 +2298,40 @@ def run_streamlit_app() -> None:
         if extra_fields:
             with st.expander("More details"):
                 for key, value in extra_fields.items():
-                    st.write(f"**{pretty_key(key)}:** {normalize_text(value)}")
+                    st.markdown(
+                        f"""
+                        <div class="holo-callout">
+                            <span class="appearance-label">{html.escape(pretty_key(key))}:</span>
+                            {html.escape(normalize_text(value))}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
     item_a, item_b = get_pair()
     total_battles = sum(item["battles"] for item in items) // 2
 
-    metric_1, metric_2, metric_3 = st.columns(3)
-    metric_1.metric("Category", config["label"])
-    metric_2.metric("Items Loaded", len(items))
-    metric_3.metric("Total Matchups", total_battles)
+    st.markdown(
+        render_console_stats(
+            (
+                ("Category", config["label"], "ACTIVE ARCHIVE"),
+                ("Items Loaded", len(items), "DATABANK COUNT"),
+                ("Total Matchups", total_battles, "DUEL MEMORY"),
+            )
+        ),
+        unsafe_allow_html=True,
+    )
 
     if st.session_state.last_pick:
-        st.success(f"Last pick: {st.session_state.last_pick}")
+        st.markdown(
+            f"""
+            <div class="transmission-strip">
+                <div class="transmission-strip-title">Last Transmission Accepted</div>
+                <div class="transmission-strip-copy">{html.escape(st.session_state.last_pick)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown('<h2 class="starwars-section">Choose your winner</h2>', unsafe_allow_html=True)
     st.markdown('<div class="section-subsignal">SELECT THE SUPERIOR ARCHIVE ENTRY</div>', unsafe_allow_html=True)
@@ -2054,10 +2339,11 @@ def run_streamlit_app() -> None:
 
     with left:
         with st.container(border=True):
-            show_item_card(item_a, "A", item_b, "pick_a_top")
+            show_item_card(item_a, "A")
             if st.button(f"Pick {item_a['name']}", key="pick_a", use_container_width=True):
                 vote(item_a["id"], item_b["id"])
                 st.rerun()
+            show_item_details(item_a)
 
     with middle:
         st.markdown('<div class="starwars-vs">VS<span class="aurebesh">DUEL SIGNAL</span></div>', unsafe_allow_html=True)
@@ -2074,6 +2360,7 @@ def run_streamlit_app() -> None:
                 st.session_state.matchup_pair_keys.setdefault(ranking_key, set()).add(
                     matchup_pair_key(current_pair[0], current_pair[1])
                 )
+                sync_all_skip_to_individual_category(item_a, item_b)
 
             next_pair = pick_pair(items, st.session_state.matchup_pair_keys.get(ranking_key, set()))
             st.session_state.current_pair[ranking_key] = (next_pair[0]["id"], next_pair[1]["id"])
@@ -2089,10 +2376,11 @@ def run_streamlit_app() -> None:
 
     with right:
         with st.container(border=True):
-            show_item_card(item_b, "B", item_a, "pick_b_top")
+            show_item_card(item_b, "B")
             if st.button(f"Pick {item_b['name']}", key="pick_b", use_container_width=True):
                 vote(item_b["id"], item_a["id"])
                 st.rerun()
+            show_item_details(item_b)
 
     st.divider()
     st.markdown(f'<h2 class="starwars-section">{config["emoji"]} Rankings</h2>', unsafe_allow_html=True)
@@ -2116,6 +2404,15 @@ def run_streamlit_app() -> None:
     ]
     rankings_df = pd.DataFrame(rows)
 
+    st.markdown(
+        """
+        <div class="transmission-strip">
+            <div class="transmission-strip-title">Archive Filter</div>
+            <div class="transmission-strip-copy">Search the visible holocron ladder by name while preserving the downloadable CSV output.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     search = st.text_input("Search rankings", placeholder="Anakin, Ahch-To, X-wing, Jedi...")
     if search.strip():
         mask = rankings_df["Name"].str.contains(search.strip(), case=False, na=False)
