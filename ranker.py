@@ -1220,13 +1220,13 @@ def run_streamlit_app() -> None:
             }
 
             .starwars-hero {
-                border: 1px solid var(--border-glow);
+                border: 3px solid rgba(255, 232, 31, 0.68);
                 border-radius: 8px;
                 background:
                     linear-gradient(90deg, rgba(255, 232, 31, 0.16), rgba(105, 215, 255, 0.06)),
                     repeating-linear-gradient(90deg, rgba(255, 232, 31, 0.05) 0 1px, transparent 1px 44px),
                     rgba(5, 8, 16, 0.78);
-                box-shadow: 0 0 32px rgba(255, 232, 31, 0.12), inset 0 0 28px rgba(105, 215, 255, 0.06);
+                box-shadow: 0 0 32px rgba(255, 232, 31, 0.18), inset 0 0 0 1px rgba(255, 232, 31, 0.28), inset 0 0 28px rgba(105, 215, 255, 0.06);
                 padding: 1.25rem 1.35rem;
                 margin-bottom: 1.15rem;
                 position: relative;
@@ -1301,7 +1301,7 @@ def run_streamlit_app() -> None:
             }
 
             .status-cell {
-                border: 1px solid rgba(105, 215, 255, 0.26);
+                border: 2px solid rgba(255, 232, 31, 0.45);
                 border-radius: 6px;
                 background: rgba(5, 12, 20, 0.7);
                 padding: 0.55rem 0.65rem;
@@ -1335,7 +1335,7 @@ def run_streamlit_app() -> None:
 
             .control-strip,
             .transmission-strip {
-                border: 1px solid rgba(105, 215, 255, 0.24);
+                border: 2px solid rgba(255, 232, 31, 0.48);
                 border-radius: 8px;
                 background:
                     linear-gradient(90deg, rgba(105, 215, 255, 0.11), rgba(255, 232, 31, 0.045)),
@@ -1372,7 +1372,7 @@ def run_streamlit_app() -> None:
             }
 
             .console-stat {
-                border: 1px solid rgba(255, 232, 31, 0.28);
+                border: 3px solid rgba(255, 232, 31, 0.52);
                 border-radius: 8px;
                 background:
                     linear-gradient(135deg, rgba(255, 232, 31, 0.11), transparent 34%),
@@ -1427,7 +1427,7 @@ def run_streamlit_app() -> None:
             .card-badge {
                 align-items: center;
                 background: rgba(255, 232, 31, 0.12);
-                border: 1px solid rgba(255, 232, 31, 0.38);
+                border: 2px solid rgba(255, 232, 31, 0.72);
                 border-radius: 999px;
                 color: var(--rebel-gold);
                 display: inline-flex;
@@ -1468,7 +1468,7 @@ def run_streamlit_app() -> None:
 
             .holo-image-shell {
                 align-items: center;
-                border: 1px solid rgba(105, 215, 255, 0.28);
+                border: 3px solid rgba(255, 232, 31, 0.58);
                 border-radius: 8px;
                 background:
                     radial-gradient(circle at center, rgba(105, 215, 255, 0.16), transparent 56%),
@@ -1516,7 +1516,7 @@ def run_streamlit_app() -> None:
             }
 
             .item-stat-grid > div {
-                border: 1px solid rgba(105, 215, 255, 0.24);
+                border: 2px solid rgba(255, 232, 31, 0.36);
                 border-radius: 6px;
                 background: rgba(5, 12, 20, 0.72);
                 padding: 0.5rem 0.55rem;
@@ -1542,12 +1542,73 @@ def run_streamlit_app() -> None:
                 background:
                     repeating-linear-gradient(180deg, rgba(255, 232, 31, 0.045) 0 1px, transparent 1px 11px),
                     linear-gradient(180deg, var(--panel-strong), rgba(13, 20, 36, 0.96));
-                border-right: 1px solid rgba(255, 232, 31, 0.22);
+                border-right: 4px solid rgba(255, 232, 31, 0.5);
             }
 
             [data-testid="stSidebar"] h2,
             [data-testid="stSidebar"] h3 {
                 color: var(--rebel-gold);
+            }
+
+            [data-testid="stSidebar"] [data-testid="stRadio"] {
+                border: 3px solid rgba(255, 232, 31, 0.52);
+                border-radius: 8px;
+                background:
+                    linear-gradient(135deg, rgba(255, 232, 31, 0.11), transparent 42%),
+                    linear-gradient(180deg, rgba(7, 13, 24, 0.94), rgba(3, 7, 14, 0.98));
+                box-shadow: inset 0 0 18px rgba(105, 215, 255, 0.04), 0 0 20px rgba(255, 232, 31, 0.06);
+                padding: 0.65rem 0.7rem 0.75rem;
+            }
+
+            [data-testid="stSidebar"] [data-testid="stRadio"] > label {
+                display: none;
+            }
+
+            [data-testid="stSidebar"] [role="radiogroup"] {
+                display: grid;
+                gap: 0.42rem;
+            }
+
+            [data-testid="stSidebar"] [role="radiogroup"] label {
+                align-items: center;
+                border: 2px solid rgba(105, 215, 255, 0.24);
+                border-radius: 6px;
+                background:
+                    linear-gradient(90deg, rgba(105, 215, 255, 0.08), rgba(255, 232, 31, 0.035)),
+                    rgba(4, 9, 17, 0.86);
+                display: flex;
+                min-height: 42px;
+                padding: 0.38rem 0.5rem;
+                width: 100%;
+            }
+
+            [data-testid="stSidebar"] [role="radiogroup"] label > div:first-child {
+                display: none;
+            }
+
+            [data-testid="stSidebar"] [role="radiogroup"] label:hover {
+                border-color: rgba(255, 232, 31, 0.62);
+                background:
+                    linear-gradient(90deg, rgba(255, 232, 31, 0.12), rgba(105, 215, 255, 0.06)),
+                    rgba(6, 12, 22, 0.94);
+            }
+
+            [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+                border-color: rgba(255, 232, 31, 0.88);
+                box-shadow: inset 4px 0 0 var(--rebel-gold), 0 0 16px rgba(255, 232, 31, 0.12);
+                background:
+                    linear-gradient(90deg, rgba(255, 232, 31, 0.18), rgba(105, 215, 255, 0.08)),
+                    rgba(8, 15, 27, 0.98);
+            }
+
+            [data-testid="stSidebar"] [role="radiogroup"] label p {
+                color: var(--text-soft);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.72rem;
+                font-weight: 800;
+                line-height: 1.1;
+                overflow-wrap: anywhere;
+                text-transform: uppercase;
             }
 
             [data-testid="stMetric"] {
@@ -1564,7 +1625,8 @@ def run_streamlit_app() -> None:
             }
 
             div[data-testid="stVerticalBlockBorderWrapper"] {
-                border-color: rgba(255, 232, 31, 0.36) !important;
+                border-color: rgba(255, 232, 31, 0.7) !important;
+                border-width: 3px !important;
                 background:
                     linear-gradient(135deg, rgba(105, 215, 255, 0.08), transparent 28%),
                     linear-gradient(180deg, rgba(12, 18, 33, 0.92), rgba(5, 8, 16, 0.96));
@@ -1644,7 +1706,7 @@ def run_streamlit_app() -> None:
             }
 
             .appearance-panel {
-                border: 1px solid rgba(255, 232, 31, 0.28);
+                border: 2px solid rgba(255, 232, 31, 0.48);
                 border-radius: 8px;
                 background: rgba(255, 232, 31, 0.06);
                 padding: 0.75rem 0.85rem;
@@ -1672,18 +1734,18 @@ def run_streamlit_app() -> None:
             }
 
             .leaderboard-shell {
-                border: 1px solid rgba(255, 232, 31, 0.32);
+                border: 3px solid rgba(255, 232, 31, 0.58);
                 border-radius: 8px;
                 background:
                     linear-gradient(135deg, rgba(255, 232, 31, 0.08), transparent 24%),
                     linear-gradient(180deg, rgba(8, 14, 27, 0.96), rgba(4, 7, 14, 0.98));
-                box-shadow: 0 0 30px rgba(105, 215, 255, 0.08), inset 0 0 28px rgba(255, 232, 31, 0.035);
+                box-shadow: 0 0 30px rgba(255, 232, 31, 0.14), inset 0 0 0 1px rgba(255, 232, 31, 0.2), inset 0 0 28px rgba(255, 232, 31, 0.035);
                 overflow: hidden;
             }
 
             .leaderboard-topline {
                 align-items: center;
-                border-bottom: 1px solid rgba(105, 215, 255, 0.24);
+                border-bottom: 3px solid rgba(255, 232, 31, 0.42);
                 display: flex;
                 justify-content: space-between;
                 gap: 1rem;
@@ -1724,7 +1786,7 @@ def run_streamlit_app() -> None:
                 background:
                     linear-gradient(180deg, rgba(255, 232, 31, 0.2), rgba(105, 215, 255, 0.08)),
                     rgba(7, 12, 22, 0.98);
-                border-bottom: 1px solid rgba(255, 232, 31, 0.32);
+                border-bottom: 3px solid rgba(255, 232, 31, 0.52);
                 display: grid;
                 grid-template-columns: 86px minmax(360px, 1fr) 110px 150px 110px;
                 gap: 0;
@@ -1745,7 +1807,7 @@ def run_streamlit_app() -> None:
 
             .leaderboard-row {
                 background: rgba(7, 12, 22, 0.54);
-                border-bottom: 1px solid rgba(105, 215, 255, 0.16);
+                border-bottom: 2px solid rgba(255, 232, 31, 0.18);
                 display: grid;
                 grid-template-columns: 86px minmax(360px, 1fr) 110px 150px 110px;
                 gap: 0;
@@ -1774,7 +1836,7 @@ def run_streamlit_app() -> None:
             .rank-medal {
                 align-items: center;
                 background: rgba(105, 215, 255, 0.1);
-                border: 1px solid rgba(105, 215, 255, 0.35);
+                border: 2px solid rgba(255, 232, 31, 0.46);
                 border-radius: 999px;
                 color: var(--hyperspace-blue);
                 display: inline-flex;
@@ -2018,8 +2080,7 @@ def run_streamlit_app() -> None:
             <h1 class="starwars-title">GLUP SHITTO RANKER</h1>
             <div class="aurebesh hero-aurebesh">GLUP SHITTO RANKER // HOLOCRON COMPARISON ENGINE</div>
             <p class="starwars-copy">
-                Pick your favorite in each matchup. This version uses the Star Wars Databank API,
-                so items include images and longer descriptions.
+                Pick your favorite in each matchup.
             </p>
             <div class="databank-grid">
                 <div class="status-cell">
@@ -2065,21 +2126,22 @@ def run_streamlit_app() -> None:
             st.rerun()
 
         st.divider()
+        st.markdown(
+            """
+            <div class="control-strip">
+                <div class="aurebesh">ARCHIVE SELECTOR // ACTIVE DATASET</div>
+                <div class="control-strip-title">Choose Category</div>
+                <div class="control-strip-copy">Switch ranking lanes without leaving the console.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         category = st.radio(
             "Choose a category",
             options=list(CATEGORIES.keys()),
             format_func=lambda key: f"{CATEGORIES[key]['emoji']} {CATEGORIES[key]['label']}",
             key="active_category",
-        )
-
-        st.markdown(
-            """
-            <div class="control-strip">
-                <div class="control-strip-title">Archive Notice</div>
-                <div class="control-strip-copy">Databank API categories do not currently include separate films or starships endpoints.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            label_visibility="collapsed",
         )
 
         st.divider()
