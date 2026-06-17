@@ -1629,9 +1629,26 @@ def run_streamlit_app() -> None:
                 border-radius: 6px;
                 color: #08111f;
                 font-family: 'Orbitron', sans-serif;
+                font-size: 0.82rem;
                 font-weight: 800;
-                text-transform: uppercase;
+                line-height: 1.08;
+                overflow: hidden;
                 box-shadow: 0 0 18px rgba(255, 232, 31, 0.18);
+                text-overflow: ellipsis;
+                text-transform: none;
+                white-space: nowrap;
+            }
+
+            .stButton > button p,
+            .stDownloadButton > button p {
+                color: #08111f !important;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.82rem;
+                font-weight: 800;
+                line-height: 1.08;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
             .stButton > button:hover,
