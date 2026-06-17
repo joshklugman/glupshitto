@@ -172,6 +172,80 @@ def summarize_appearances(appearances: Dict[str, List[str]]) -> str:
     )
 
 
+def truncate_text(value: Any, limit: int = 160) -> str:
+    text = normalize_text(value)
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 3].rstrip()}..."
+
+
+def render_rankings_table(rows: Sequence[dict]) -> str:
+    if not rows:
+        return """
+        <div class="ranker-empty">
+            <div class="aurebesh">NO ARCHIVE MATCHES FOUND</div>
+            <div>No rankings match the current search.</div>
+        </div>
+        """
+
+    body_rows: List[str] = []
+    for row in rows:
+        rank = int(row.get("Rank", 0) or 0)
+        rank_class = " top-three" if rank <= 3 else ""
+        rating = html.escape(str(row.get("Rating", "-")))
+        name = html.escape(str(row.get("Name", "Unknown")))
+        category = html.escape(str(row.get("Category", "Unknown")))
+        wins = int(row.get("Wins", 0) or 0)
+        losses = int(row.get("Losses", 0) or 0)
+        battles = int(row.get("Battles", 0) or 0)
+        description = html.escape(truncate_text(row.get("Description") or "No description available.", 190))
+
+        body_rows.append(
+            f"""
+<div class="leaderboard-row">
+    <div class="rank-cell"><span class="rank-medal{rank_class}">#{rank}</span></div>
+    <div class="identity-cell">
+        <div class="leader-name">{name}</div>
+        <div class="leader-category">{category}</div>
+        <div class="leader-desc">{description}</div>
+    </div>
+    <div><span class="rating-chip">{rating}</span></div>
+    <div>
+        <div class="record-grid">
+            <span><strong>{wins}</strong>W</span>
+            <span><strong>{losses}</strong>L</span>
+        </div>
+    </div>
+    <div><span class="battle-count">{battles}</span></div>
+</div>
+"""
+        )
+
+    return f"""
+<div class="leaderboard-shell">
+    <div class="leaderboard-topline">
+        <div>
+            <div class="leaderboard-title">Holocron Leaderboard</div>
+            <div class="aurebesh">LIVE RANKING ARRAY // DATABANK OUTPUT</div>
+        </div>
+        <div class="leaderboard-count">{len(rows)} records</div>
+    </div>
+    <div class="leaderboard-scroll">
+        <div class="leaderboard-grid">
+            <div class="leaderboard-head">
+                <div>Rank</div>
+                <div>Databank Entry</div>
+                <div>Rating</div>
+                <div>Record</div>
+                <div>Battles</div>
+            </div>
+            {''.join(body_rows)}
+        </div>
+    </div>
+</div>
+    """
+
+
 def extract_data(payload: Any) -> Tuple[List[dict], Optional[str]]:
     """Return data list and next-page URL/path from a Databank response."""
     if isinstance(payload, list):
@@ -1012,6 +1086,7 @@ def run_streamlit_app() -> None:
         """
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;700&display=swap');
+            @import url('https://fonts.cdnfonts.com/css/aurebesh');
 
             :root {
                 --space: #05070d;
@@ -1024,21 +1099,37 @@ def run_streamlit_app() -> None:
                 --text-soft: #f7fbff;
                 --text-muted: #d8e5f5;
                 --border-glow: rgba(255, 232, 31, 0.34);
+                --imperial-white: rgba(247, 251, 255, 0.86);
+                --holo-green: #9dffcf;
             }
 
             .stApp {
                 background:
-                    radial-gradient(circle at 16% 18%, rgba(105, 215, 255, 0.12) 0 1px, transparent 2px),
-                    radial-gradient(circle at 78% 8%, rgba(255, 232, 31, 0.18) 0 1px, transparent 2px),
-                    radial-gradient(circle at 52% 42%, rgba(255, 255, 255, 0.10) 0 1px, transparent 2px),
+                    linear-gradient(115deg, transparent 0 44%, rgba(105, 215, 255, 0.09) 44.4% 44.8%, transparent 45.2%),
+                    linear-gradient(73deg, transparent 0 61%, rgba(255, 232, 31, 0.08) 61.3% 61.6%, transparent 62%),
+                    radial-gradient(circle at 16% 18%, rgba(105, 215, 255, 0.16) 0 1px, transparent 2px),
+                    radial-gradient(circle at 78% 8%, rgba(255, 232, 31, 0.22) 0 1px, transparent 2px),
+                    radial-gradient(circle at 52% 42%, rgba(255, 255, 255, 0.16) 0 1px, transparent 2px),
+                    radial-gradient(circle at 88% 76%, rgba(255, 255, 255, 0.12) 0 1px, transparent 2px),
                     linear-gradient(135deg, rgba(5, 7, 13, 0.94), rgba(7, 10, 22, 0.98)),
                     repeating-radial-gradient(circle at center, #0a1020 0 1px, #05070d 1px 4px);
                 color: var(--text-soft);
             }
 
+            .stApp:before {
+                content: "";
+                position: fixed;
+                inset: 0;
+                background: repeating-linear-gradient(180deg, rgba(105, 215, 255, 0.035) 0 1px, transparent 1px 5px);
+                pointer-events: none;
+                z-index: 0;
+            }
+
             .block-container {
                 padding-top: 2rem;
                 padding-bottom: 3rem;
+                position: relative;
+                z-index: 1;
             }
 
             h1, h2, h3, [data-testid="stMetricLabel"], .st-emotion-cache-10trblm {
@@ -1068,7 +1159,8 @@ def run_streamlit_app() -> None:
                 border: 1px solid var(--border-glow);
                 border-radius: 8px;
                 background:
-                    linear-gradient(90deg, rgba(255, 232, 31, 0.12), rgba(105, 215, 255, 0.05)),
+                    linear-gradient(90deg, rgba(255, 232, 31, 0.16), rgba(105, 215, 255, 0.06)),
+                    repeating-linear-gradient(90deg, rgba(255, 232, 31, 0.05) 0 1px, transparent 1px 44px),
                     rgba(5, 8, 16, 0.78);
                 box-shadow: 0 0 32px rgba(255, 232, 31, 0.12), inset 0 0 28px rgba(105, 215, 255, 0.06);
                 padding: 1.25rem 1.35rem;
@@ -1081,7 +1173,9 @@ def run_streamlit_app() -> None:
                 content: "";
                 position: absolute;
                 inset: 0;
-                background: repeating-linear-gradient(180deg, rgba(255, 232, 31, 0.06) 0 1px, transparent 1px 7px);
+                background:
+                    linear-gradient(90deg, rgba(255, 232, 31, 0.16), transparent 18%, transparent 82%, rgba(105, 215, 255, 0.13)),
+                    repeating-linear-gradient(180deg, rgba(255, 232, 31, 0.06) 0 1px, transparent 1px 7px);
                 pointer-events: none;
             }
 
@@ -1093,6 +1187,8 @@ def run_streamlit_app() -> None:
                 line-height: 0.95;
                 margin: 0;
                 text-shadow: 0 0 18px rgba(255, 232, 31, 0.38);
+                position: relative;
+                z-index: 1;
             }
 
             .starwars-kicker {
@@ -1102,6 +1198,8 @@ def run_streamlit_app() -> None:
                 font-weight: 700;
                 margin-bottom: 0.45rem;
                 text-transform: uppercase;
+                position: relative;
+                z-index: 1;
             }
 
             .starwars-copy {
@@ -1109,10 +1207,110 @@ def run_streamlit_app() -> None:
                 max-width: 850px;
                 margin: 0.75rem 0 0;
                 font-size: 1.08rem;
+                position: relative;
+                z-index: 1;
+            }
+
+            .aurebesh {
+                color: var(--holo-green);
+                font-family: 'Aurebesh', 'Orbitron', sans-serif;
+                font-size: 0.88rem;
+                letter-spacing: 0.08em;
+                opacity: 0.9;
+                text-shadow: 0 0 12px rgba(157, 255, 207, 0.28);
+            }
+
+            .hero-aurebesh {
+                margin-top: 0.45rem;
+                position: relative;
+                z-index: 1;
+            }
+
+            .databank-grid {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 0.55rem;
+                margin-top: 1rem;
+                max-width: 900px;
+                position: relative;
+                z-index: 1;
+            }
+
+            .status-cell {
+                border: 1px solid rgba(105, 215, 255, 0.26);
+                border-radius: 6px;
+                background: rgba(5, 12, 20, 0.7);
+                padding: 0.55rem 0.65rem;
+                min-height: 58px;
+            }
+
+            .status-label {
+                color: var(--hyperspace-blue);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.68rem;
+                font-weight: 800;
+                text-transform: uppercase;
+            }
+
+            .status-value {
+                color: var(--imperial-white);
+                font-size: 1.02rem;
+                font-weight: 700;
+                line-height: 1.1;
+                margin-top: 0.2rem;
+            }
+
+            .holo-callout {
+                border-left: 3px solid var(--hyperspace-blue);
+                background: linear-gradient(90deg, rgba(105, 215, 255, 0.12), rgba(105, 215, 255, 0.02));
+                color: var(--text-soft);
+                padding: 0.75rem 0.9rem;
+                margin: 0.8rem 0;
+            }
+
+            .card-sigil {
+                align-items: center;
+                display: flex;
+                gap: 0.55rem;
+                margin-bottom: 0.35rem;
+            }
+
+            .card-badge {
+                align-items: center;
+                background: rgba(255, 232, 31, 0.12);
+                border: 1px solid rgba(255, 232, 31, 0.38);
+                border-radius: 999px;
+                color: var(--rebel-gold);
+                display: inline-flex;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.75rem;
+                font-weight: 900;
+                height: 2rem;
+                justify-content: center;
+                width: 2rem;
+            }
+
+            .card-title {
+                color: var(--text-soft);
+                font-family: 'Orbitron', sans-serif;
+                font-size: clamp(1.15rem, 2vw, 1.65rem);
+                font-weight: 800;
+                line-height: 1.1;
+            }
+
+            .card-category {
+                color: var(--holo-green);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.7rem;
+                font-weight: 700;
+                margin-top: 0.18rem;
+                text-transform: uppercase;
             }
 
             [data-testid="stSidebar"] {
-                background: linear-gradient(180deg, var(--panel-strong), rgba(13, 20, 36, 0.96));
+                background:
+                    repeating-linear-gradient(180deg, rgba(255, 232, 31, 0.045) 0 1px, transparent 1px 11px),
+                    linear-gradient(180deg, var(--panel-strong), rgba(13, 20, 36, 0.96));
                 border-right: 1px solid rgba(255, 232, 31, 0.22);
             }
 
@@ -1136,7 +1334,9 @@ def run_streamlit_app() -> None:
 
             div[data-testid="stVerticalBlockBorderWrapper"] {
                 border-color: rgba(255, 232, 31, 0.36) !important;
-                background: linear-gradient(180deg, rgba(12, 18, 33, 0.92), rgba(5, 8, 16, 0.96));
+                background:
+                    linear-gradient(135deg, rgba(105, 215, 255, 0.08), transparent 28%),
+                    linear-gradient(180deg, rgba(12, 18, 33, 0.92), rgba(5, 8, 16, 0.96));
                 box-shadow: 0 0 24px rgba(105, 215, 255, 0.08), inset 0 0 22px rgba(255, 232, 31, 0.04);
             }
 
@@ -1189,11 +1389,27 @@ def run_streamlit_app() -> None:
                 margin: 1.2rem 0;
             }
 
+            .starwars-vs .aurebesh {
+                display: block;
+                font-size: 0.72rem;
+                margin-top: 0.25rem;
+            }
+
             .starwars-section {
                 color: var(--rebel-gold);
                 font-family: 'Orbitron', sans-serif;
                 text-transform: uppercase;
                 text-shadow: 0 0 12px rgba(255, 232, 31, 0.24);
+            }
+
+            .section-subsignal {
+                border-top: 1px solid rgba(105, 215, 255, 0.25);
+                color: var(--holo-green);
+                font-family: 'Aurebesh', 'Orbitron', sans-serif;
+                font-size: 0.78rem;
+                letter-spacing: 0.08em;
+                margin: -0.35rem 0 1rem;
+                padding-top: 0.4rem;
             }
 
             .appearance-panel {
@@ -1224,14 +1440,248 @@ def run_streamlit_app() -> None:
                 font-weight: 800;
             }
 
-            [data-testid="stDataFrame"] {
+            .leaderboard-shell {
+                border: 1px solid rgba(255, 232, 31, 0.32);
+                border-radius: 8px;
+                background:
+                    linear-gradient(135deg, rgba(255, 232, 31, 0.08), transparent 24%),
+                    linear-gradient(180deg, rgba(8, 14, 27, 0.96), rgba(4, 7, 14, 0.98));
+                box-shadow: 0 0 30px rgba(105, 215, 255, 0.08), inset 0 0 28px rgba(255, 232, 31, 0.035);
+                overflow: hidden;
+            }
+
+            .leaderboard-topline {
+                align-items: center;
+                border-bottom: 1px solid rgba(105, 215, 255, 0.24);
+                display: flex;
+                justify-content: space-between;
+                gap: 1rem;
+                padding: 0.9rem 1rem;
+            }
+
+            .leaderboard-title {
+                color: var(--rebel-gold);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 1.05rem;
+                font-weight: 900;
+                text-transform: uppercase;
+            }
+
+            .leaderboard-count {
+                border: 1px solid rgba(157, 255, 207, 0.32);
+                border-radius: 999px;
+                color: var(--holo-green);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.74rem;
+                font-weight: 800;
+                padding: 0.35rem 0.65rem;
+                text-transform: uppercase;
+                white-space: nowrap;
+            }
+
+            .leaderboard-scroll {
+                max-height: 720px;
+                overflow: auto;
+            }
+
+            .leaderboard-grid {
+                min-width: 1060px;
+                width: 100%;
+            }
+
+            .leaderboard-head {
+                background:
+                    linear-gradient(180deg, rgba(255, 232, 31, 0.2), rgba(105, 215, 255, 0.08)),
+                    rgba(7, 12, 22, 0.98);
+                border-bottom: 1px solid rgba(255, 232, 31, 0.32);
+                display: grid;
+                grid-template-columns: 86px minmax(360px, 1fr) 110px 150px 110px;
+                gap: 0;
+                position: sticky;
+                top: 0;
+                z-index: 2;
+            }
+
+            .leaderboard-head div {
+                color: var(--rebel-gold);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.72rem;
+                font-weight: 900;
+                padding: 0.72rem 0.8rem;
+                text-align: left;
+                text-transform: uppercase;
+            }
+
+            .leaderboard-row {
+                background: rgba(7, 12, 22, 0.54);
+                border-bottom: 1px solid rgba(105, 215, 255, 0.16);
+                display: grid;
+                grid-template-columns: 86px minmax(360px, 1fr) 110px 150px 110px;
+                gap: 0;
+                transition: background 140ms ease, box-shadow 140ms ease;
+            }
+
+            .leaderboard-row:nth-child(odd) {
+                background: rgba(11, 19, 34, 0.66);
+            }
+
+            .leaderboard-row:hover {
+                background: rgba(105, 215, 255, 0.13);
+                box-shadow: inset 3px 0 0 var(--hyperspace-blue);
+            }
+
+            .leaderboard-row > div {
+                color: var(--text-soft);
+                padding: 0.78rem 0.8rem;
+                vertical-align: top;
+            }
+
+            .rank-cell {
+                width: 76px;
+            }
+
+            .rank-medal {
+                align-items: center;
+                background: rgba(105, 215, 255, 0.1);
+                border: 1px solid rgba(105, 215, 255, 0.35);
+                border-radius: 999px;
+                color: var(--hyperspace-blue);
+                display: inline-flex;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.78rem;
+                font-weight: 900;
+                justify-content: center;
+                min-width: 3rem;
+                padding: 0.28rem 0.45rem;
+            }
+
+            .rank-medal.top-three {
+                background: rgba(255, 232, 31, 0.13);
+                border-color: rgba(255, 232, 31, 0.55);
+                color: var(--rebel-gold);
+                box-shadow: 0 0 16px rgba(255, 232, 31, 0.12);
+            }
+
+            .identity-cell {
+                min-width: 280px;
+            }
+
+            .leader-name {
+                color: var(--imperial-white);
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.98rem;
+                font-weight: 800;
+                line-height: 1.18;
+            }
+
+            .leader-category {
+                color: var(--holo-green);
+                font-size: 0.8rem;
+                font-weight: 800;
+                margin-top: 0.16rem;
+                text-transform: uppercase;
+            }
+
+            .leader-desc {
+                color: var(--text-muted);
+                font-size: 0.92rem;
+                line-height: 1.25;
+                margin-top: 0.38rem;
+                max-width: 500px;
+            }
+
+            .rating-chip {
+                background: linear-gradient(180deg, rgba(255, 232, 31, 0.95), rgba(199, 145, 18, 0.95));
+                border-radius: 6px;
+                color: #07101d;
+                display: inline-block;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.86rem;
+                font-weight: 900;
+                min-width: 3.7rem;
+                padding: 0.36rem 0.48rem;
+                text-align: center;
+            }
+
+            .record-grid {
+                display: grid;
+                gap: 0.25rem;
+                grid-template-columns: repeat(2, minmax(42px, 1fr));
+            }
+
+            .record-grid span,
+            .battle-count {
+                border: 1px solid rgba(105, 215, 255, 0.24);
+                border-radius: 6px;
+                color: var(--text-soft);
+                display: inline-block;
+                font-weight: 700;
+                padding: 0.3rem 0.42rem;
+                text-align: center;
+            }
+
+            .record-grid strong {
+                color: var(--hyperspace-blue);
+                font-family: 'Orbitron', sans-serif;
+                margin-right: 0.12rem;
+            }
+
+            .battle-count {
+                color: var(--rebel-gold);
+                font-family: 'Orbitron', sans-serif;
+                font-weight: 900;
+                min-width: 3rem;
+            }
+
+            .image-chip {
+                border-radius: 999px;
+                display: inline-block;
+                font-size: 0.78rem;
+                font-weight: 800;
+                padding: 0.32rem 0.55rem;
+                text-transform: uppercase;
+                white-space: nowrap;
+            }
+
+            .image-chip.online {
+                background: rgba(157, 255, 207, 0.1);
+                border: 1px solid rgba(157, 255, 207, 0.42);
+                color: var(--holo-green);
+            }
+
+            .image-chip.offline {
+                background: rgba(255, 75, 75, 0.1);
+                border: 1px solid rgba(255, 75, 75, 0.34);
+                color: #ffb3b3;
+            }
+
+            .appearances-cell {
+                color: var(--text-muted);
+                line-height: 1.25;
+                min-width: 260px;
+            }
+
+            .ranker-empty {
                 border: 1px solid rgba(105, 215, 255, 0.28);
                 border-radius: 8px;
-                overflow: hidden;
+                background: rgba(5, 8, 16, 0.72);
+                color: var(--text-soft);
+                padding: 1rem;
             }
 
             .stAlert {
                 border-radius: 8px;
+            }
+
+            @media (max-width: 780px) {
+                .databank-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+
+                .leaderboard-topline {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
             }
         </style>
         """,
@@ -1249,7 +1699,26 @@ def run_streamlit_app() -> None:
             <div class="starwars-hero">
                 <div class="starwars-kicker">Secure databank access</div>
                 <h1 class="starwars-title">GLUP SHITTO RANKER</h1>
+                <div class="aurebesh hero-aurebesh">GLUP SHITTO RANKER // RESTRICTED ARCHIVE</div>
                 <p class="starwars-copy">Log in to save your personal ranking progress across every mode.</p>
+                <div class="databank-grid">
+                    <div class="status-cell">
+                        <div class="status-label">Archive</div>
+                        <div class="status-value">Databank Sync</div>
+                    </div>
+                    <div class="status-cell">
+                        <div class="status-label">Protocol</div>
+                        <div class="status-value">Beli Pairing</div>
+                    </div>
+                    <div class="status-cell">
+                        <div class="status-label">Signal</div>
+                        <div class="status-value">Encrypted</div>
+                    </div>
+                    <div class="status-cell">
+                        <div class="status-label">Mode</div>
+                        <div class="status-value">Personal Save</div>
+                    </div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1311,10 +1780,29 @@ def run_streamlit_app() -> None:
         <div class="starwars-hero">
             <div class="starwars-kicker">Databank ranking console</div>
             <h1 class="starwars-title">GLUP SHITTO RANKER</h1>
+            <div class="aurebesh hero-aurebesh">GLUP SHITTO RANKER // HOLOCRON COMPARISON ENGINE</div>
             <p class="starwars-copy">
                 Pick your favorite in each matchup. This version uses the Star Wars Databank API,
                 so items include images and longer descriptions.
             </p>
+            <div class="databank-grid">
+                <div class="status-cell">
+                    <div class="status-label">Archive</div>
+                    <div class="status-value">Star Wars Databank</div>
+                </div>
+                <div class="status-cell">
+                    <div class="status-label">Pairing</div>
+                    <div class="status-value">Unseen Priority</div>
+                </div>
+                <div class="status-cell">
+                    <div class="status-label">Rank Core</div>
+                    <div class="status-value">Elo Matrix</div>
+                </div>
+                <div class="status-cell">
+                    <div class="status-label">Transmission</div>
+                    <div class="status-value">Supabase Relay</div>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1322,6 +1810,7 @@ def run_streamlit_app() -> None:
 
     with st.sidebar:
         st.header("Controls")
+        st.markdown('<div class="aurebesh">CONTROL NODE // SECTOR MENU</div>', unsafe_allow_html=True)
         st.caption(f"Logged in as {st.session_state.username}")
         if st.button("Log out", use_container_width=True):
             st.session_state.username = None
@@ -1483,6 +1972,21 @@ def run_streamlit_app() -> None:
         )
 
     def show_item_card(item: dict, label: str, opponent: dict, top_pick_key: str) -> None:
+        item_category = CATEGORIES.get(item.get("category", ""), {}).get("label", item.get("category", "Unknown"))
+        st.markdown(
+            f"""
+            <div class="card-sigil">
+                <div class="card-badge">{html.escape(label)}</div>
+                <div>
+                    <div class="aurebesh">DATABANK RECORD {html.escape(label)} // TARGET LOCK</div>
+                    <div class="card-title">{html.escape(item["name"])}</div>
+                    <div class="card-category">{html.escape(item_category)}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
         name_col, pick_col = st.columns([0.68, 0.32], vertical_alignment="center")
         with name_col:
             st.markdown(f"### {label}: {item['name']}")
@@ -1490,9 +1994,6 @@ def run_streamlit_app() -> None:
             if st.button("Pick", key=top_pick_key, use_container_width=True):
                 vote(item["id"], opponent["id"])
                 st.rerun()
-
-        item_category = CATEGORIES.get(item.get("category", ""), {}).get("label", item.get("category", "Unknown"))
-        st.caption(item_category)
 
         image_url = item.get("image")
         if image_url:
@@ -1504,7 +2005,10 @@ def run_streamlit_app() -> None:
         st.caption(f"Record: {item['wins']}W / {item['losses']}L · {item['battles']} battles")
 
         description = item.get("description") or "No description available."
-        st.write(description)
+        st.markdown(
+            f'<div class="holo-callout">{html.escape(description)}</div>',
+            unsafe_allow_html=True,
+        )
 
         appearances = item.get("appearances", {})
         if appearances:
@@ -1545,6 +2049,7 @@ def run_streamlit_app() -> None:
         st.success(f"Last pick: {st.session_state.last_pick}")
 
     st.markdown('<h2 class="starwars-section">Choose your winner</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="section-subsignal">SELECT THE SUPERIOR ARCHIVE ENTRY</div>', unsafe_allow_html=True)
     left, middle, right = st.columns([1, 0.16, 1])
 
     with left:
@@ -1555,7 +2060,7 @@ def run_streamlit_app() -> None:
                 st.rerun()
 
     with middle:
-        st.markdown('<div class="starwars-vs">VS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="starwars-vs">VS<span class="aurebesh">DUEL SIGNAL</span></div>', unsafe_allow_html=True)
         if st.button("Skip", use_container_width=True):
             current_pair = st.session_state.current_pair.get(ranking_key)
             if current_pair and len(current_pair) == 2:
@@ -1591,6 +2096,7 @@ def run_streamlit_app() -> None:
 
     st.divider()
     st.markdown(f'<h2 class="starwars-section">{config["emoji"]} Rankings</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="section-subsignal">LIVE HOLOCRON LADDER // UPDATED AFTER EACH PICK</div>', unsafe_allow_html=True)
 
     ranked = rank_items(items)
     rows = [
@@ -1615,7 +2121,10 @@ def run_streamlit_app() -> None:
         mask = rankings_df["Name"].str.contains(search.strip(), case=False, na=False)
         rankings_df = rankings_df[mask]
 
-    st.dataframe(rankings_df, use_container_width=True, hide_index=True)
+    st.markdown(
+        render_rankings_table(rankings_df.to_dict("records")),
+        unsafe_allow_html=True,
+    )
 
     csv = rankings_df.to_csv(index=False).encode("utf-8")
     st.download_button(
