@@ -38,8 +38,9 @@ API_BASE = "https://starwars-databank-server.onrender.com/api/v1"
 PAGE_LIMIT = 100
 DB_PATH = Path(__file__).with_name("ranker_backend.sqlite3")
 FORMULA_STATE_KEYS = ("rating", "wins", "losses", "battles")
-SUPABASE_USERS_TABLE = "ranker_users"
+SUPABASE_ACCOUNTS_TABLE = "ranker_accounts"
 SUPABASE_PROGRESS_TABLE = "ranker_progress"
+SUPABASE_MATCHUPS_TABLE = "ranker_matchups"
 
 CATEGORIES: Dict[str, Dict[str, Any]] = {
     "all": {
@@ -346,6 +347,19 @@ def parse_json_field(value: Any) -> Any:
     return json.loads(value) if isinstance(value, str) else value
 
 
+def get_supabase_account(username: str, select: str = "id") -> Optional[dict]:
+    rows = supabase_request(
+        "GET",
+        SUPABASE_ACCOUNTS_TABLE,
+        params={
+            "username": f"eq.{username.strip()}",
+            "select": select,
+            "limit": "1",
+        },
+    )
+    return rows[0] if rows else None
+
+
 def init_backend(db_path: Path = DB_PATH) -> None:
     if supabase_enabled():
         return
@@ -375,6 +389,29 @@ def init_backend(db_path: Path = DB_PATH) -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS matchups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                ranking_key TEXT NOT NULL,
+                pair_key TEXT NOT NULL,
+                item_a_id TEXT NOT NULL,
+                item_b_id TEXT NOT NULL,
+                winner_id TEXT,
+                loser_id TEXT,
+                skipped INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (username) REFERENCES users(username)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS matchups_user_ranking_pair_idx
+            ON matchups (username, ranking_key, pair_key)
+            """
+        )
         conn.commit()
 
 
@@ -386,17 +423,13 @@ def create_user(username: str, password: str, db_path: Path = DB_PATH) -> bool:
     salt, password_hash = hash_password(password)
 
     if supabase_enabled():
-        existing = supabase_request(
-            "GET",
-            SUPABASE_USERS_TABLE,
-            params={"username": f"eq.{username}", "select": "username", "limit": "1"},
-        )
+        existing = get_supabase_account(username, "id")
         if existing:
             return False
 
         supabase_request(
             "POST",
-            SUPABASE_USERS_TABLE,
+            SUPABASE_ACCOUNTS_TABLE,
             payload={
                 "username": username,
                 "salt": salt,
@@ -427,15 +460,10 @@ def authenticate_user(username: str, password: str, db_path: Path = DB_PATH) -> 
     username = username.strip()
 
     if supabase_enabled():
-        rows = supabase_request(
-            "GET",
-            SUPABASE_USERS_TABLE,
-            params={"username": f"eq.{username}", "select": "salt,password_hash", "limit": "1"},
-        )
-        if not rows:
+        row = get_supabase_account(username, "salt,password_hash")
+        if not row:
             return False
 
-        row = rows[0]
         _, actual_hash = hash_password(password, row["salt"])
         return secrets.compare_digest(actual_hash, row["password_hash"])
 
@@ -455,11 +483,15 @@ def authenticate_user(username: str, password: str, db_path: Path = DB_PATH) -> 
 
 def load_user_progress(username: str, ranking_key: str, db_path: Path = DB_PATH) -> Optional[dict]:
     if supabase_enabled():
+        account = get_supabase_account(username, "id")
+        if not account:
+            return None
+
         rows = supabase_request(
             "GET",
             SUPABASE_PROGRESS_TABLE,
             params={
-                "username": f"eq.{username}",
+                "account_id": f"eq.{account['id']}",
                 "ranking_key": f"eq.{ranking_key}",
                 "select": "items_json,current_pair_json,last_pick",
                 "limit": "1",
@@ -531,6 +563,108 @@ def apply_saved_progress(items: List[dict], progress: Optional[dict]) -> None:
                 item[key] = int(saved_item.get(key, item[key]))
 
 
+def matchup_pair_key(item_a_id: str, item_b_id: str) -> str:
+    return "::".join(sorted((str(item_a_id), str(item_b_id))))
+
+
+def load_matchup_pair_keys(username: str, ranking_key: str, db_path: Path = DB_PATH) -> set[str]:
+    if supabase_enabled():
+        account = get_supabase_account(username, "id")
+        if not account:
+            return set()
+
+        rows = supabase_request(
+            "GET",
+            SUPABASE_MATCHUPS_TABLE,
+            params={
+                "account_id": f"eq.{account['id']}",
+                "ranking_key": f"eq.{ranking_key}",
+                "select": "pair_key",
+            },
+        )
+        return {row["pair_key"] for row in rows or [] if row.get("pair_key")}
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        rows = conn.execute(
+            """
+            SELECT pair_key
+            FROM matchups
+            WHERE username = ? AND ranking_key = ?
+            """,
+            (username, ranking_key),
+        ).fetchall()
+
+    return {row[0] for row in rows}
+
+
+def save_matchup_result(
+    username: str,
+    ranking_key: str,
+    item_a_id: str,
+    item_b_id: str,
+    *,
+    winner_id: Optional[str] = None,
+    loser_id: Optional[str] = None,
+    skipped: bool = False,
+    db_path: Path = DB_PATH,
+) -> None:
+    pair_key = matchup_pair_key(item_a_id, item_b_id)
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    if supabase_enabled():
+        account = get_supabase_account(username, "id")
+        if not account:
+            raise RuntimeError("Could not find account for matchup history.")
+
+        supabase_request(
+            "POST",
+            SUPABASE_MATCHUPS_TABLE,
+            payload={
+                "account_id": account["id"],
+                "ranking_key": ranking_key,
+                "pair_key": pair_key,
+                "item_a_id": item_a_id,
+                "item_b_id": item_b_id,
+                "winner_id": winner_id,
+                "loser_id": loser_id,
+                "skipped": skipped,
+                "created_at": created_at,
+            },
+            prefer="return=minimal",
+        )
+        return
+
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute(
+            """
+            INSERT INTO matchups (
+                username,
+                ranking_key,
+                pair_key,
+                item_a_id,
+                item_b_id,
+                winner_id,
+                loser_id,
+                skipped,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                username,
+                ranking_key,
+                pair_key,
+                item_a_id,
+                item_b_id,
+                winner_id,
+                loser_id,
+                1 if skipped else 0,
+                created_at,
+            ),
+        )
+        conn.commit()
+
+
 def save_user_progress(
     username: str,
     ranking_key: str,
@@ -546,12 +680,16 @@ def save_user_progress(
     current_pair_state = list(current_pair) if current_pair else None
 
     if supabase_enabled():
+        account = get_supabase_account(username, "id")
+        if not account:
+            raise RuntimeError("Could not find account for saved ranking progress.")
+
         supabase_request(
             "POST",
             SUPABASE_PROGRESS_TABLE,
-            params={"on_conflict": "username,ranking_key"},
+            params={"on_conflict": "account_id,ranking_key"},
             payload={
-                "username": username,
+                "account_id": account["id"],
                 "ranking_key": ranking_key,
                 "items_json": items_state,
                 "current_pair_json": current_pair_state,
@@ -589,21 +727,45 @@ def save_user_progress(
 
 def delete_user_progress_for_category(username: str, category: str, db_path: Path = DB_PATH) -> None:
     if supabase_enabled():
+        account = get_supabase_account(username, "id")
+        if not account:
+            return
+
         supabase_request(
             "DELETE",
-            SUPABASE_PROGRESS_TABLE,
-            params={"username": f"eq.{username}", "ranking_key": f"eq.{category}"},
+            SUPABASE_MATCHUPS_TABLE,
+            params={"account_id": f"eq.{account['id']}", "ranking_key": f"eq.{category}"},
+            prefer="return=minimal",
+        )
+        supabase_request(
+            "DELETE",
+            SUPABASE_MATCHUPS_TABLE,
+            params={"account_id": f"eq.{account['id']}", "ranking_key": f"like.{category}:%"},
             prefer="return=minimal",
         )
         supabase_request(
             "DELETE",
             SUPABASE_PROGRESS_TABLE,
-            params={"username": f"eq.{username}", "ranking_key": f"like.{category}:%"},
+            params={"account_id": f"eq.{account['id']}", "ranking_key": f"eq.{category}"},
+            prefer="return=minimal",
+        )
+        supabase_request(
+            "DELETE",
+            SUPABASE_PROGRESS_TABLE,
+            params={"account_id": f"eq.{account['id']}", "ranking_key": f"like.{category}:%"},
             prefer="return=minimal",
         )
         return
 
     with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute(
+            "DELETE FROM matchups WHERE username = ? AND ranking_key = ?",
+            (username, category),
+        )
+        conn.execute(
+            "DELETE FROM matchups WHERE username = ? AND ranking_key LIKE ?",
+            (username, f"{category}:%"),
+        )
         conn.execute(
             "DELETE FROM progress WHERE username = ? AND ranking_key = ?",
             (username, category),
@@ -628,16 +790,44 @@ def update_elo(winner_rating: int, loser_rating: int, k: int = 32) -> Tuple[int,
     )
 
 
-def pick_pair(items: Sequence[dict]) -> Tuple[dict, dict]:
+def pick_pair(items: Sequence[dict], seen_pair_keys: Optional[set[str]] = None) -> Tuple[dict, dict]:
     if len(items) < 2:
         raise ValueError("Need at least two items to rank.")
 
-    least_seen_pool = sorted(items, key=lambda item: item.get("battles", 0))[: min(20, len(items))]
-    first = random.choice(least_seen_pool)
+    seen_pair_keys = seen_pair_keys or set()
+    least_seen_pool = sorted(items, key=lambda item: item.get("battles", 0))[: min(30, len(items))]
+    candidates: List[Tuple[int, int, float, dict, dict]] = []
 
-    opponents = [item for item in items if item["id"] != first["id"]]
-    similar_pool = sorted(opponents, key=lambda item: abs(item["rating"] - first["rating"]))[: min(12, len(opponents))]
-    second = random.choice(similar_pool)
+    for first in least_seen_pool:
+        opponents = [item for item in items if item["id"] != first["id"]]
+        similar_pool = sorted(
+            opponents,
+            key=lambda item: abs(item["rating"] - first["rating"]),
+        )[: min(24, len(opponents))]
+
+        for second in similar_pool:
+            if matchup_pair_key(first["id"], second["id"]) in seen_pair_keys:
+                continue
+
+            candidates.append(
+                (
+                    int(first.get("battles", 0)) + int(second.get("battles", 0)),
+                    abs(int(first["rating"]) - int(second["rating"])),
+                    random.random(),
+                    first,
+                    second,
+                )
+            )
+
+    if candidates:
+        candidates.sort(key=lambda candidate: candidate[:3])
+        _, _, _, first, second = random.choice(candidates[: min(12, len(candidates))])
+    else:
+        least_seen_pool = sorted(items, key=lambda item: item.get("battles", 0))[: min(20, len(items))]
+        first = random.choice(least_seen_pool)
+        opponents = [item for item in items if item["id"] != first["id"]]
+        similar_pool = sorted(opponents, key=lambda item: abs(item["rating"] - first["rating"]))[: min(12, len(opponents))]
+        second = random.choice(similar_pool)
 
     pair = [first, second]
     random.shuffle(pair)
@@ -1108,6 +1298,8 @@ def run_streamlit_app() -> None:
         st.session_state.rankings = {}
     if "current_pair" not in st.session_state:
         st.session_state.current_pair = {}
+    if "matchup_pair_keys" not in st.session_state:
+        st.session_state.matchup_pair_keys = {}
     if "last_pick" not in st.session_state:
         st.session_state.last_pick = None
     if "active_category" not in st.session_state:
@@ -1135,6 +1327,7 @@ def run_streamlit_app() -> None:
             st.session_state.username = None
             st.session_state.rankings = {}
             st.session_state.current_pair = {}
+            st.session_state.matchup_pair_keys = {}
             st.session_state.last_pick = None
             st.rerun()
 
@@ -1156,6 +1349,9 @@ def run_streamlit_app() -> None:
             for key in list(st.session_state.current_pair.keys()):
                 if key.startswith(f"{category}:"):
                     st.session_state.current_pair.pop(key, None)
+            for key in list(st.session_state.matchup_pair_keys.keys()):
+                if key == category or key.startswith(f"{category}:"):
+                    st.session_state.matchup_pair_keys.pop(key, None)
             delete_user_progress_for_category(st.session_state.username, category)
             st.session_state.last_pick = None
             st.rerun()
@@ -1167,6 +1363,12 @@ def run_streamlit_app() -> None:
     config = CATEGORIES[category]
     ranking_key = category
     max_pages = None
+
+    if ranking_key not in st.session_state.matchup_pair_keys:
+        st.session_state.matchup_pair_keys[ranking_key] = load_matchup_pair_keys(
+            st.session_state.username,
+            ranking_key,
+        )
 
     try:
         if ranking_key not in st.session_state.rankings:
@@ -1209,7 +1411,7 @@ def run_streamlit_app() -> None:
             if id_a in by_id and id_b in by_id:
                 return by_id[id_a], by_id[id_b]
 
-        new_pair = pick_pair(items)
+        new_pair = pick_pair(items, st.session_state.matchup_pair_keys.get(ranking_key, set()))
         st.session_state.current_pair[ranking_key] = (new_pair[0]["id"], new_pair[1]["id"])
         save_user_progress(
             st.session_state.username,
@@ -1252,10 +1454,25 @@ def run_streamlit_app() -> None:
     def vote(winner_id: str, loser_id: str) -> None:
         winner_item = next(item for item in items if item["id"] == winner_id)
         loser_item = next(item for item in items if item["id"] == loser_id)
+        current_pair = st.session_state.current_pair.get(ranking_key)
+
+        if current_pair and len(current_pair) == 2:
+            save_matchup_result(
+                st.session_state.username,
+                ranking_key,
+                current_pair[0],
+                current_pair[1],
+                winner_id=winner_id,
+                loser_id=loser_id,
+            )
+            st.session_state.matchup_pair_keys.setdefault(ranking_key, set()).add(
+                matchup_pair_key(current_pair[0], current_pair[1])
+            )
+
         winner_name = apply_vote(items, winner_id, loser_id)
         sync_all_vote_to_individual_category(winner_item, loser_item)
         st.session_state.last_pick = winner_name
-        next_pair = pick_pair(items)
+        next_pair = pick_pair(items, st.session_state.matchup_pair_keys.get(ranking_key, set()))
         st.session_state.current_pair[ranking_key] = (next_pair[0]["id"], next_pair[1]["id"])
         save_user_progress(
             st.session_state.username,
@@ -1340,7 +1557,20 @@ def run_streamlit_app() -> None:
     with middle:
         st.markdown('<div class="starwars-vs">VS</div>', unsafe_allow_html=True)
         if st.button("Skip", use_container_width=True):
-            next_pair = pick_pair(items)
+            current_pair = st.session_state.current_pair.get(ranking_key)
+            if current_pair and len(current_pair) == 2:
+                save_matchup_result(
+                    st.session_state.username,
+                    ranking_key,
+                    current_pair[0],
+                    current_pair[1],
+                    skipped=True,
+                )
+                st.session_state.matchup_pair_keys.setdefault(ranking_key, set()).add(
+                    matchup_pair_key(current_pair[0], current_pair[1])
+                )
+
+            next_pair = pick_pair(items, st.session_state.matchup_pair_keys.get(ranking_key, set()))
             st.session_state.current_pair[ranking_key] = (next_pair[0]["id"], next_pair[1]["id"])
             st.session_state.last_pick = None
             save_user_progress(
